@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends
+from fastapi.security.api_key import APIKeyHeader, APIKey
+from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -9,11 +11,35 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Security settings
+API_KEY_NAME = "X-API-Key"
+API_KEY = os.getenv("API_KEY")  # Set this in .env
+
+# Security dependency
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+
+
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    """Validate API key"""
+    if api_key_header == API_KEY:
+        return api_key_header
+    raise HTTPException(status_code=403, detail="Invalid API Key")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Women Empowerment Platform API",
     description="API for women's health tracking and community platform",
     version="1.0.0",
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # AWS Lambda handler
@@ -35,6 +61,7 @@ class HealthCheckResponse(BaseModel):
     tags=["System"],
     summary="Health check endpoint",
     response_description="Basic health check response with system status",
+    dependencies=[Depends(get_api_key)],  # Add this line to protect the endpoint
 )
 async def health_check() -> HealthCheckResponse:
     """

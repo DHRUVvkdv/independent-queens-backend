@@ -47,7 +47,7 @@ app.add_middleware(
 app.include_router(sentiment.router, dependencies=[Depends(get_api_key)])
 
 # AWS Lambda handler
-handler = Mangum(app)
+handler = Mangum(app, lifespan="off")
 
 if __name__ == "__main__":
     import uvicorn

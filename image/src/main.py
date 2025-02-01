@@ -13,7 +13,7 @@ load_dotenv()
 
 # Security settings
 API_KEY_NAME = "X-API-Key"
-API_KEY = os.getenv("API_KEY")  # Set this in .env
+API_KEY = os.getenv("NEXT_API_KEY")  # Set this in .env
 
 # Security dependency
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)

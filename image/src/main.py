@@ -15,6 +15,7 @@ from api.routes import (
     auth,
     openai_test,
     menstrual_health,
+    canvas,
 )
 
 # Load environment variables
@@ -59,6 +60,8 @@ app.include_router(journal.router, dependencies=[Depends(get_api_key)])
 app.include_router(auth.router, dependencies=[Depends(get_api_key)])
 app.include_router(openai_test.router, dependencies=[Depends(get_api_key)])
 app.include_router(menstrual_health.router, dependencies=[Depends(get_api_key)])
+app.include_router(canvas.router, dependencies=[Depends(get_api_key)])
+
 
 # AWS Lambda handler
 handler = Mangum(app, lifespan="off")

@@ -26,6 +26,7 @@ class QAPair(BaseModel):
 
 class User(BaseModel):
     email: EmailStr = Field(..., description="User's email - primary identifier")
+    cognito_id: str = Field(..., description="AWS Cognito User ID")
     first_name: str
     last_name: str
     phone_number: Optional[str] = None
@@ -49,18 +50,48 @@ class User(BaseModel):
         json_schema_extra = {
             "example": {
                 "email": "jane.doe@university.edu",
+                "cognito_id": "us-east-1_xxxxxx_123e4567-e89b-12d3-a456-426614174000",
                 "first_name": "Jane",
                 "last_name": "Doe",
                 "phone_number": "+1234567890",
-                "canvas_token": "canvas_token_xxx",
-                "coins": 100,
-                "profile_image_path": "users/profile/xxx.jpg",
-                "bio": "Computer Science student",
-                "profession": "Student",
+                "canvas_token": "canvas_token_xyz_123",
+                "coins": 10,
+                "profile_image_path": "users/profiles/jane_doe_123.jpg",
+                "bio": "Computer Science graduate student passionate about AI and cloud computing",
+                "profession": "Graduate Student",
                 "university": "MIT",
-                "age": 22,
-                "skills": ["Python", "AWS"],
-                "interests": ["AI", "Cloud Computing"],
-                "location": "Boston, MA",
+                "age": 24,
+                "skills": [
+                    "Python",
+                    "AWS",
+                    "Machine Learning",
+                    "Data Structures",
+                    "Algorithms",
+                ],
+                "interests": [
+                    "Artificial Intelligence",
+                    "Cloud Computing",
+                    "Women in Tech",
+                    "Research",
+                    "Hackathons",
+                ],
+                "location": "Cambridge, MA",
             }
         }
+
+
+class SignUpUser(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    first_name: str
+    last_name: str
+    age: int = Field(..., ge=0, le=120)
+    profession: str
+    skills: List[str]
+    interests: Optional[List[str]] = []
+    university: str
+
+
+class SignInUser(BaseModel):
+    email: EmailStr
+    password: str

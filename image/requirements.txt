@@ -7,3 +7,5 @@ python-dotenv==1.0.0
 motor 
 pymongo 
 email-validator
+boto3
+botocore

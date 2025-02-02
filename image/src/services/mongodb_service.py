@@ -27,6 +27,7 @@ class MongoDBService:
 
             # Create index on email
             await self.users_collection.create_index("email", unique=True)
+            await self.users_collection.create_index("cognito_id", unique=True)
 
             await self.offers_collection.create_index("email")
             await self.journals_collection.create_index([("email", 1)])

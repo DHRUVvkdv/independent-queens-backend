@@ -7,7 +7,15 @@ import os
 from dotenv import load_dotenv
 
 # Import routes
-from api.routes import sentiment, user, offer, journal, auth, openai_test
+from api.routes import (
+    sentiment,
+    user,
+    offer,
+    journal,
+    auth,
+    openai_test,
+    menstrual_health,
+)
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +58,7 @@ app.include_router(offer.router, dependencies=[Depends(get_api_key)])
 app.include_router(journal.router, dependencies=[Depends(get_api_key)])
 app.include_router(auth.router, dependencies=[Depends(get_api_key)])
 app.include_router(openai_test.router, dependencies=[Depends(get_api_key)])
+app.include_router(menstrual_health.router, dependencies=[Depends(get_api_key)])
 
 # AWS Lambda handler
 handler = Mangum(app, lifespan="off")

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from models.journal import Journal, EmotionAnalysis
+from models.journal_insights import JournalInsights
 from services.mongodb_service import MongoDBService, get_mongodb_service
 from services.huggingface_service import HuggingFaceService
 from config.logger import logger
@@ -199,4 +200,35 @@ async def analyze_journal_content(
         logger.error(f"Error in emotion analysis: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, detail="Failed to analyze journal emotions"
+        )
+
+
+@router.get("/insights/30-day-window/{email}", response_model=JournalInsights)
+async def get_journal_insights(
+    email: str,
+    mongo_service: MongoDBService = Depends(get_mongodb_service),
+) -> JournalInsights:
+    """
+    Get insights from journals for the past 30 days including:
+    - Total number of entries
+    - Date range analyzed
+    - Frequency of all emotions
+    - Frequency of dominant emotions
+    Both sorted and unsorted formats are provided
+    """
+    try:
+        # Check if user exists
+        user = await mongo_service.get_user_by_email(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        insights = await mongo_service.get_journal_insights(email)
+        return JournalInsights(**insights)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting journal insights: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Failed to generate journal insights"
         )

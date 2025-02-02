@@ -5,6 +5,7 @@ from models.journal import Journal, EmotionAnalysis
 from datetime import datetime
 import os
 from config.logger import logger
+from datetime import timedelta
 
 
 class MongoDBService:
@@ -133,6 +134,152 @@ class MongoDBService:
         if result.modified_count:
             return await self.get_journal_by_id(journal_id)
         return None
+
+    async def get_journal_insights(self, email: str, days: int = 30) -> dict:
+        """Get insights from journals for the past N days"""
+        try:
+            # Calculate date range
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=days)
+
+            # Format dates for response
+            formatted_start = start_date.strftime("%m-%d-%Y")
+            formatted_end = end_date.strftime("%m-%d-%Y")
+
+            # MongoDB aggregation pipeline
+            pipeline = [
+                # Match journals for the user within date range
+                {
+                    "$match": {
+                        "email": email,
+                        "$expr": {
+                            "$and": [
+                                {
+                                    "$gte": [
+                                        {
+                                            "$dateFromString": {
+                                                "dateString": "$date",
+                                                "format": "%m-%d-%Y",
+                                            }
+                                        },
+                                        start_date,
+                                    ]
+                                },
+                                {
+                                    "$lte": [
+                                        {
+                                            "$dateFromString": {
+                                                "dateString": "$date",
+                                                "format": "%m-%d-%Y",
+                                            }
+                                        },
+                                        end_date,
+                                    ]
+                                },
+                            ]
+                        },
+                    }
+                },
+                # Get total count of entries and emotions data
+                {
+                    "$facet": {
+                        "total_entries": [{"$count": "count"}],
+                        "all_emotions": [
+                            {
+                                "$project": {
+                                    "emotions": {
+                                        "$objectToArray": "$emotion_analysis.emotions"
+                                    }
+                                }
+                            },
+                            {"$unwind": "$emotions"},
+                            {
+                                "$group": {
+                                    "_id": "$emotions.k",
+                                    "count": {
+                                        "$sum": 1
+                                    },  # Count occurrences instead of summing values
+                                    "average_score": {
+                                        "$avg": "$emotions.v"
+                                    },  # Keep track of average score
+                                }
+                            },
+                        ],
+                        "dominant_emotions": [
+                            {
+                                "$group": {
+                                    "_id": "$emotion_analysis.dominant_emotion",
+                                    "count": {"$sum": 1},
+                                }
+                            }
+                        ],
+                    }
+                },
+            ]
+
+            # Execute aggregation
+            result = await self.journals_collection.aggregate(pipeline).next()
+
+            # Process all_emotions results
+            all_emotions_dict = {}
+            all_emotions_sorted = []
+            for emotion in result.get("all_emotions", []):
+                if emotion["_id"]:  # Check for valid emotion name
+                    count = emotion["count"]
+                    avg_score = round(emotion["average_score"], 4)
+                    all_emotions_dict[emotion["_id"]] = {
+                        "count": count,
+                        "average_score": avg_score,
+                    }
+                    all_emotions_sorted.append(
+                        {
+                            "emotion": emotion["_id"],
+                            "count": count,
+                            "average_score": avg_score,
+                        }
+                    )
+
+            # Sort by count
+            all_emotions_sorted.sort(key=lambda x: x["count"], reverse=True)
+
+            # Process dominant_emotions results
+            dominant_emotions_dict = {}
+            dominant_emotions_sorted = []
+            for emotion in result.get("dominant_emotions", []):
+                if emotion["_id"]:  # Check for valid emotion name
+                    count = emotion["count"]
+                    dominant_emotions_dict[emotion["_id"]] = count
+                    dominant_emotions_sorted.append(
+                        {"emotion": emotion["_id"], "count": count}
+                    )
+
+            # Sort by count
+            dominant_emotions_sorted.sort(key=lambda x: x["count"], reverse=True)
+
+            # Get total entries count safely
+            total_entries = result.get("total_entries", [{"count": 0}])[0].get(
+                "count", 0
+            )
+
+            # Format final response
+            return {
+                "metadata": {
+                    "date_range": {"start": formatted_start, "end": formatted_end},
+                    "total_entries": total_entries,
+                },
+                "emotions": {
+                    "all_emotions": all_emotions_dict,
+                    "dominant_emotions": dominant_emotions_dict,
+                },
+                "sorted_emotions": {
+                    "all_emotions": all_emotions_sorted,
+                    "dominant_emotions": dominant_emotions_sorted,
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting journal insights: {str(e)}", exc_info=True)
+            raise
 
 
 async def get_mongodb_service():

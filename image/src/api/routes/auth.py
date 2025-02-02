@@ -5,13 +5,14 @@ from botocore.exceptions import ClientError
 from models.user import User, SignUpUser, SignInUser
 from services.mongodb_service import MongoDBService, get_mongodb_service
 import os
+import logging
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 # Initialize Cognito client
 cognito_client = boto3.client(
     "cognito-idp",
-    region_name=os.getenv("AWS_REGION"),
+    region_name=os.getenv("AWS_REGION_LOCAL"),
 )
 USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID")
 CLIENT_ID = os.getenv("COGNITO_CLIENT_ID")
@@ -35,12 +36,27 @@ async def signup(
         # Get the Cognito user ID from the response
         cognito_user_id = cognito_response["UserSub"]
 
-        # Auto confirm the user
-        cognito_client.admin_confirm_sign_up(
-            UserPoolId=USER_POOL_ID, Username=user_data.email
-        )
+        try:
+            # Auto confirm the user
+            cognito_client.admin_confirm_sign_up(
+                UserPoolId=USER_POOL_ID, Username=user_data.email
+            )
+        except ClientError as confirm_error:
+            logging.error(f"Error confirming user: {str(confirm_error)}")
+            # If confirmation fails, we should handle cleaning up the created user
+            try:
+                cognito_client.admin_delete_user(
+                    UserPoolId=USER_POOL_ID, Username=user_data.email
+                )
+            except Exception as delete_error:
+                logging.error(
+                    f"Error cleaning up unconfirmed user: {str(delete_error)}"
+                )
+            raise HTTPException(
+                status_code=500, detail=f"Failed to confirm user: {str(confirm_error)}"
+            )
 
-        # Create user in MongoDB with cognito_id
+        # Create user in MongoDB
         user = User(
             email=user_data.email,
             cognito_id=cognito_user_id,
@@ -63,6 +79,19 @@ async def signup(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/confirm-signup")
+async def confirm_signup(email: str, confirmation_code: str) -> Dict:
+    """Confirm user signup with code (fallback endpoint)"""
+    try:
+        cognito_client.confirm_sign_up(
+            ClientId=CLIENT_ID, Username=email, ConfirmationCode=confirmation_code
+        )
+        return {"message": "User confirmed successfully"}
+    except ClientError as e:
+        error = e.response["Error"]
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.post("/signin")
@@ -88,8 +117,24 @@ async def signin(user_data: SignInUser) -> Dict:
 
     except ClientError as e:
         error = e.response["Error"]
+        if error["Code"] == "UserNotConfirmedException":
+            raise HTTPException(
+                status_code=400,
+                detail="User is not confirmed. Please confirm your email first.",
+            )
         if error["Code"] in ["NotAuthorizedException", "UserNotFoundException"]:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/resend-confirmation")
+async def resend_confirmation(email: str) -> Dict:
+    """Resend confirmation code"""
+    try:
+        cognito_client.resend_confirmation_code(ClientId=CLIENT_ID, Username=email)
+        return {"message": "Confirmation code resent"}
+    except ClientError as e:
+        error = e.response["Error"]
+        raise HTTPException(status_code=400, detail=str(error))

@@ -61,16 +61,37 @@ class MongoDBService:
         await self.users_collection.insert_one(user_dict)
         return user
 
-    async def update_user(self, email: str, user_update: dict) -> Optional[User]:
-        user_update["updated_at"] = datetime.utcnow()
+    async def update_user(self, email: str, update_data: dict) -> Optional[User]:
+        """
+        Update a user document
+        """
+        try:
+            # Convert any Pydantic models in update data to dictionaries
+            processed_update = {}
+            for key, value in update_data.items():
+                if key == "events":
+                    # Handle events list specially
+                    processed_update[key] = [
+                        event.dict() if hasattr(event, "dict") else event
+                        for event in value
+                    ]
+                else:
+                    # Handle other fields
+                    processed_update[key] = (
+                        value.dict() if hasattr(value, "dict") else value
+                    )
 
-        result = await self.users_collection.update_one(
-            {"email": email}, {"$set": user_update}
-        )
+            result = await self.users_collection.update_one(
+                {"email": email}, {"$set": processed_update}
+            )
 
-        if result.modified_count:
-            return await self.get_user_by_email(email)
-        return None
+            if result.matched_count > 0:
+                return await self.get_user_by_email(email)
+            return None
+
+        except Exception as e:
+            logger.error(f"Error updating user: {str(e)}", exc_info=True)
+            raise
 
     async def delete_user(self, email: str) -> bool:
         result = await self.users_collection.delete_one({"email": email})

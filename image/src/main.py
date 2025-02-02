@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 
 # Import routes
-from api.routes import sentiment, user
+from api.routes import sentiment, user, offer
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +46,7 @@ app.add_middleware(
 # Include routers
 app.include_router(sentiment.router, dependencies=[Depends(get_api_key)])
 app.include_router(user.router, dependencies=[Depends(get_api_key)])
+app.include_router(offer.router, dependencies=[Depends(get_api_key)])
 
 # AWS Lambda handler
 handler = Mangum(app, lifespan="off")

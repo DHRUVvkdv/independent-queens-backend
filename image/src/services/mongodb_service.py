@@ -11,6 +11,7 @@ class MongoDBService:
         self.client = None
         self.db = None
         self.users_collection = None
+        self.offers_collection = None
 
     async def connect(self):
         try:
@@ -19,9 +20,12 @@ class MongoDBService:
             )
             self.db = self.client[os.getenv("MONGODB_DB_NAME", "women_empowerment_db")]
             self.users_collection = self.db.users
+            self.offers_collection = self.db.offers
 
             # Create index on email
             await self.users_collection.create_index("email", unique=True)
+
+            await self.offers_collection.create_index("email")
 
             logger.info("Successfully connected to MongoDB")
         except Exception as e:
@@ -64,3 +68,13 @@ class MongoDBService:
     async def delete_user(self, email: str) -> bool:
         result = await self.users_collection.delete_one({"email": email})
         return result.deleted_count > 0
+
+
+async def get_mongodb_service():
+    """Dependency function to get MongoDB service instance"""
+    db = MongoDBService()
+    await db.connect()
+    try:
+        yield db
+    finally:
+        await db.close()

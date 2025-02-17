@@ -6,6 +6,8 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 
 Backend infrastructure for Independent Queens - an AI-powered women's health and empowerment platform. Winner of Capital One's "Best Financial Hack" at HackViolet 2025.
+Live at: [https://iqns.dhruvv.dev/](https://iqns.dhruvv.dev/)
+FrontEnd Code: [https://github.com/DHRUVvkdv/independent-queens-frontend](https://github.com/DHRUVvkdv/independent-queens-frontend)
 
 ## 🌟 Features
 
